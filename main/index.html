@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0, minimum-scale=0.5">
+    <title>MDEasy - Markdown查看器</title>
+    <!-- 预加载关键资源 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    
+    <!-- 异步加载外部库 -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/marked/marked.min.js" as="script">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js" as="script">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css"></noscript>
+    <style>
+        /* 全局样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* 浅色主题 */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --success-color: #10b981;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+        }
+
+        [data-theme="dark"] {
+            /* 深色主题 */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --accent-color: #60a5fa;
+            --accent-hover: #3b82f6;
+            --success-color: #34d399;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* 应用容器 */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 工具栏 */
+        .toolbar {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-color);
+        }
+
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            outline: none;
+        }
+
+        .btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-large {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .btn-large svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 欢迎界面 */
+        .welcome-screen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+        }
+
+        .welcome-content {
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .welcome-icon {
+            margin: 0 auto 1.5rem;
+            width: 80px;
+            height: 80px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .welcome-icon svg {
+            width: 40px;
+            height: 40px;
+            color: white;
+        }
+
+        .welcome-content h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .welcome-content p {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .welcome-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        /* 拖拽区域 */
+        .drag-drop-area {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            text-align: center;
+            background-color: var(--bg-secondary);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .drag-drop-area:hover,
+        .drag-drop-area.drag-over {
+            border-color: var(--accent-color);
+            background-color: var(--bg-tertiary);
+            transform: translateY(-2px);
+        }
+
+        .drag-drop-area svg {
+            width: 32px;
+            height: 32px;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .drag-drop-area p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        /* 内容查看器 */
+        .content-viewer {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
+        }
+
+        .file-info {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .file-size {
+            color: var(--text-muted);
+        }
+
+        /* Markdown 内容样式 */
+        .markdown-content {
+            flex: 1;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            overflow-y: auto;
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: var(--text-primary);
+        }
+
+        .markdown-content h1 {
+            font-size: 2.25rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .markdown-content h2 {
+            font-size: 1.875rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.25rem;
+        }
+
+        .markdown-content h3 {
+            font-size: 1.5rem;
+        }
+
+        .markdown-content h4 {
+            font-size: 1.25rem;
+        }
+
+        .markdown-content h5 {
+            font-size: 1.125rem;
+        }
+
+        .markdown-content h6 {
+            font-size: 1rem;
+        }
+
+        .markdown-content p {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        .markdown-content li {
+            margin-bottom: 0.25rem;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid var(--accent-color);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            background-color: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            font-style: italic;
+        }
+
+        .markdown-content code {
+            background-color: var(--bg-secondary);
+            padding: 0.125rem 0.25rem;
+            border-radius: var(--radius-sm);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: var(--accent-color);
+        }
+
+        .markdown-content pre {
+            background-color: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+            color: var(--text-primary);
+        }
+
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .markdown-content th,
+        .markdown-content td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .markdown-content th {
+            background-color: var(--bg-secondary);
+            font-weight: 600;
+        }
+
+        .markdown-content a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+
+        .markdown-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius-md);
+            margin: 1rem 0;
+            box-shadow: var(--shadow-md);
+        }
+
+        .markdown-content hr {
+            border: none;
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 2rem 0;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .toolbar {
+                padding: 0.75rem 1rem;
+            }
+            
+            .app-title {
+                font-size: 1.125rem;
+            }
+            
+            .welcome-content {
+                padding: 0 1rem;
+            }
+            
+            .welcome-content h2 {
+                font-size: 1.75rem;
+            }
+            
+            .markdown-content {
+                padding: 1rem;
+            }
+            
+            .markdown-content h1 {
+                font-size: 1.875rem;
+            }
+            
+            .markdown-content h2 {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* 加载指示器 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 移动端优化 */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 0;
+            }
+            
+            .toolbar {
+                padding: 0.75rem 1rem;
+                gap: 0.75rem;
+            }
+            
+            .btn {
+                padding: 0.6rem 1rem;
+                font-size: 14px;
+                min-height: 44px; /* iOS推荐的最小触摸目标 */
+            }
+            
+            .btn-large {
+                padding: 1rem 1.5rem;
+                font-size: 16px;
+                min-height: 48px;
+            }
+            
+            .welcome-content h2 {
+                font-size: 1.75rem;
+            }
+            
+            .welcome-content p {
+                font-size: 1rem;
+            }
+            
+            .drag-drop-area {
+                padding: 2rem 1rem;
+                margin-top: 1.5rem;
+                min-height: 120px;
+            }
+            
+            .drag-drop-area p {
+                font-size: 14px;
+            }
+            
+            .file-info {
+                padding: 0.75rem 1rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.25rem;
+            }
+            
+            .markdown-content {
+                padding: 1rem;
+                font-size: 16px; /* 移动端更大的字体 */
+                line-height: 1.6;
+            }
+            
+            .markdown-content h1 {
+                font-size: 1.75rem;
+            }
+            
+            .markdown-content h2 {
+                font-size: 1.5rem;
+            }
+            
+            .markdown-content h3 {
+                font-size: 1.25rem;
+            }
+            
+            .markdown-content pre {
+                font-size: 14px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .markdown-content table {
+                font-size: 14px;
+                overflow-x: auto;
+                display: block;
+                white-space: nowrap;
+            }
+        }
+        
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            .btn:hover {
+                transform: none;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+            
+            .drag-drop-area:hover {
+                transform: none;
+            }
+            
+            /* 增加触摸目标大小 */
+            .btn, .drag-drop-area {
+                min-height: 44px;
+            }
+        }
+
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .markdown-content {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* 主题切换动画 */
+        .theme-icon {
+            transition: transform 0.3s ease;
+        }
+
+        [data-theme="dark"] .theme-icon {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载指示器 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载...</div>
+    </div>
+
+    <div class="app-container">
+        <!-- 顶部工具栏 -->
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <h1 class="app-title">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10,9 9,9 8,9"></polyline>
+                    </svg>
+                    MDEasy
+                </h1>
+            </div>
+            <div class="toolbar-right">
+                <input type="file" id="fileInput" accept=".md,.markdown,.txt" style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                    </svg>
+                    打开文件
+                </button>
+                <button class="btn btn-secondary" id="homeButton" title="返回主页 (Esc)" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9,22 9,12 15,12 15,22"></polyline>
+                    </svg>
+                    返回主页
+                </button>
+                <button class="btn btn-secondary" id="themeToggle">
+                    <svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <!-- 欢迎界面 -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <div class="welcome-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10,9 9,9 8,9"></polyline>
+                        </svg>
+                    </div>
+                    <h2>欢迎使用 MDEasy</h2>
+                    <p>一个简洁美观的 Markdown 文件查看器</p>
+                    <div style="margin: 20px 0; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                        <p>🎨 Made by D.H.Z.Studio</p>
+                    </div>
+                    <div class="welcome-actions">
+                        <button class="btn btn-primary btn-large" onclick="document.getElementById('fileInput').click()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14,2 14,8 20,8"></polyline>
+                            </svg>
+                            选择 Markdown 文件
+                        </button>
+                        <div class="drag-drop-area" id="dragDropArea">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7,10 12,15 17,10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <p>或将文件拖拽到此处</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Markdown 内容显示区域 -->
+            <div class="content-viewer" id="contentViewer" style="display: none;">
+                <div class="file-info">
+                    <span class="file-name" id="fileName"></span>
+                    <span class="file-size" id="fileSize"></span>
+                </div>
+                <div class="markdown-content" id="markdownContent"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 异步加载外部库 -->
+    <script async src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+
+    <script>
+        // 应用状态管理
+        class MDEasyApp {
+            constructor() {
+                this.currentTheme = localStorage.getItem('theme') || 'light';
+                this.librariesLoaded = false;
+                this.init();
+            }
+
+            init() {
+                this.setupTheme();
+                this.setupEventListeners();
+                this.checkLibrariesAndInit();
+                this.setupDragAndDrop();
+            }
+
+            // 检查外部库是否加载完成
+            checkLibrariesAndInit() {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                let checkCount = 0;
+                const maxChecks = 50; // 最多检查50次（5秒）
+                
+                const checkInterval = setInterval(() => {
+                    checkCount++;
+                    
+                    // 检查库是否加载完成
+                    const markedLoaded = typeof marked !== 'undefined' && marked.parse;
+                    const hljsLoaded = typeof hljs !== 'undefined' && hljs.highlightElement;
+                    
+                    if (markedLoaded && hljsLoaded) {
+                        this.librariesLoaded = true;
+                        this.setupMarkdownRenderer();
+                        this.hideLoadingOverlay();
+                        clearInterval(checkInterval);
+                        console.log('外部库加载完成');
+                    } else if (checkCount >= maxChecks) {
+                        // 超时处理 - 使用降级模式
+                        console.warn('外部库加载超时，启用降级模式');
+                        this.librariesLoaded = 'fallback';
+                        this.hideLoadingOverlay();
+                        clearInterval(checkInterval);
+                    }
+                }, 100);
+            }
+
+            // 隐藏加载指示器
+            hideLoadingOverlay() {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingOverlay.style.display = 'none';
+                    }, 300);
+                }
+            }
+
+            // 主题设置
+            setupTheme() {
+                document.documentElement.setAttribute('data-theme', this.currentTheme);
+                this.updateThemeIcon();
+            }
+
+            toggleTheme() {
+                this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', this.currentTheme);
+                localStorage.setItem('theme', this.currentTheme);
+                this.updateThemeIcon();
+            }
+
+            updateThemeIcon() {
+                const themeIcon = document.querySelector('.theme-icon');
+                if (this.currentTheme === 'dark') {
+                    themeIcon.innerHTML = `
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    `;
+                } else {
+                    themeIcon.innerHTML = `
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    `;
+                }
+            }
+
+            // 事件监听器设置
+            setupEventListeners() {
+                // 文件输入
+                const fileInput = document.getElementById('fileInput');
+                fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+
+                // 主题切换
+                const themeToggle = document.getElementById('themeToggle');
+                themeToggle.addEventListener('click', () => this.toggleTheme());
+
+                // 返回主页按钮
+                const homeButton = document.getElementById('homeButton');
+                homeButton.addEventListener('click', () => this.showWelcomeScreen());
+
+                // 键盘快捷键
+                document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+            }
+
+            // Markdown 渲染器设置
+            setupMarkdownRenderer() {
+                try {
+                    if (typeof marked !== 'undefined' && marked.setOptions) {
+                        // 移动端兼容的配置
+                        const options = {
+                            breaks: true,
+                            gfm: true,
+                            sanitize: false,
+                            smartLists: true,
+                            smartypants: false
+                        };
+                        
+                        // 只有在highlight.js可用时才添加高亮功能
+                        if (typeof hljs !== 'undefined' && hljs.highlightElement) {
+                            options.highlight = function(code, lang) {
+                                try {
+                                    if (lang && hljs.getLanguage && hljs.getLanguage(lang)) {
+                                        return hljs.highlight(code, { language: lang }).value;
+                                    }
+                                } catch (err) {
+                                    console.warn('Highlight.js error:', err);
+                                }
+                                return code;
+                            };
+                        }
+                        
+                        marked.setOptions(options);
+                        console.log('Markdown渲染器初始化完成');
+                    } else {
+                        console.warn('Marked库未完全加载，将使用降级模式');
+                    }
+                } catch (error) {
+                    console.error('Markdown渲染器设置失败:', error);
+                    this.librariesLoaded = 'fallback';
+                }
+            }
+
+            // 拖拽功能设置
+            setupDragAndDrop() {
+                const dragDropArea = document.getElementById('dragDropArea');
+                const body = document.body;
+
+                // 检测是否为移动设备
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                                ('ontouchstart' in window) || 
+                                (navigator.maxTouchPoints > 0);
+
+                if (!isMobile) {
+                    // 桌面端：启用拖拽功能
+                    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                        body.addEventListener(eventName, this.preventDefaults, false);
+                        dragDropArea.addEventListener(eventName, this.preventDefaults, false);
+                    });
+
+                    // 拖拽视觉反馈
+                    ['dragenter', 'dragover'].forEach(eventName => {
+                        dragDropArea.addEventListener(eventName, () => {
+                            dragDropArea.classList.add('drag-over');
+                        }, false);
+                    });
+
+                    ['dragleave', 'drop'].forEach(eventName => {
+                        dragDropArea.addEventListener(eventName, () => {
+                            dragDropArea.classList.remove('drag-over');
+                        }, false);
+                    });
+
+                    // 处理文件拖拽
+                    dragDropArea.addEventListener('drop', (e) => this.handleDrop(e), false);
+                } else {
+                    // 移动端：优化触摸体验
+                    dragDropArea.style.cursor = 'pointer';
+                    
+                    // 添加触摸反馈
+                    dragDropArea.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        dragDropArea.classList.add('drag-over');
+                    }, { passive: false });
+                    
+                    dragDropArea.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        dragDropArea.classList.remove('drag-over');
+                        // 延迟触发点击，避免双重触发
+                        setTimeout(() => {
+                            document.getElementById('fileInput').click();
+                        }, 100);
+                    }, { passive: false });
+                    
+                    dragDropArea.addEventListener('touchcancel', () => {
+                        dragDropArea.classList.remove('drag-over');
+                    });
+                }
+                
+                // 通用点击事件（兼容所有设备）
+                dragDropArea.addEventListener('click', (e) => {
+                    // 防止移动端双重触发
+                    if (!isMobile || e.type === 'click') {
+                        document.getElementById('fileInput').click();
+                    }
+                });
+            }
+
+            preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            // 处理文件拖拽
+            handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length > 0) {
+                    this.processFile(files[0]);
+                }
+            }
+
+            // 处理文件选择
+            handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    this.processFile(file);
+                }
+            }
+
+            // 处理文件
+            processFile(file) {
+                try {
+                    // 检查文件是否存在
+                    if (!file) {
+                        this.showError('未选择文件');
+                        return;
+                    }
+                    
+                    // 检查文件类型
+                    const validTypes = ['.md', '.markdown', '.txt'];
+                    const fileName = file.name.toLowerCase();
+                    const isValidType = validTypes.some(type => fileName.endsWith(type));
+                    
+                    if (!isValidType) {
+                        this.showError('请选择 Markdown 文件 (.md, .markdown) 或文本文件 (.txt)');
+                        return;
+                    }
+
+                    // 移动端文件大小限制更严格 (5MB)
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    const maxSize = isMobile ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+                    const maxSizeText = isMobile ? '5MB' : '10MB';
+                    
+                    if (file.size > maxSize) {
+                        this.showError(`文件大小不能超过 ${maxSizeText}`);
+                        return;
+                    }
+
+                    this.readFile(file);
+                } catch (error) {
+                    console.error('处理文件时出错:', error);
+                    this.showError('文件处理失败: ' + error.message);
+                }
+            }
+
+            // 读取文件
+            readFile(file) {
+                try {
+                    const reader = new FileReader();
+                    
+                    // 添加加载指示
+                    this.showLoadingIndicator('正在读取文件...');
+                    
+                    reader.onload = (e) => {
+                        try {
+                            this.hideLoadingIndicator();
+                            const content = e.target.result;
+                            
+                            // 检查内容是否为空
+                            if (!content && content !== '') {
+                                this.showError('文件内容为空或无法读取');
+                                return;
+                            }
+                            
+                            this.displayMarkdown(content, file);
+                        } catch (error) {
+                            this.hideLoadingIndicator();
+                            console.error('文件内容处理失败:', error);
+                            this.showError('文件读取失败: ' + error.message);
+                        }
+                    };
+                    
+                    reader.onerror = (error) => {
+                        this.hideLoadingIndicator();
+                        console.error('FileReader错误:', error);
+                        this.showError('文件读取失败，请重试');
+                    };
+                    
+                    reader.onabort = () => {
+                        this.hideLoadingIndicator();
+                        this.showError('文件读取被中断');
+                    };
+                    
+                    // 尝试以UTF-8编码读取，如果失败则尝试其他编码
+                    reader.readAsText(file, 'UTF-8');
+                    
+                } catch (error) {
+                    this.hideLoadingIndicator();
+                    console.error('创建FileReader失败:', error);
+                    this.showError('文件读取器初始化失败: ' + error.message);
+                }
+            }
+            
+            // 显示加载指示器
+            showLoadingIndicator(message = '加载中...') {
+                let indicator = document.getElementById('fileLoadingIndicator');
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'fileLoadingIndicator';
+                    indicator.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: var(--bg-secondary);
+                        color: var(--text-primary);
+                        padding: 1rem 2rem;
+                        border-radius: 0.5rem;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        z-index: 1001;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        font-size: 14px;
+                    `;
+                    document.body.appendChild(indicator);
+                }
+                indicator.innerHTML = `
+                    <div style="width: 16px; height: 16px; border: 2px solid var(--text-secondary); border-top: 2px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <span>${message}</span>
+                `;
+                indicator.style.display = 'flex';
+            }
+            
+            // 隐藏加载指示器
+            hideLoadingIndicator() {
+                const indicator = document.getElementById('fileLoadingIndicator');
+                if (indicator) {
+                    indicator.style.display = 'none';
+                }
+            }
+
+            // 显示 Markdown 内容
+            displayMarkdown(content, file) {
+                try {
+                    // 隐藏欢迎界面
+                    document.getElementById('welcomeScreen').style.display = 'none';
+                    
+                    // 显示内容查看器
+                    const contentViewer = document.getElementById('contentViewer');
+                    contentViewer.style.display = 'flex';
+                    
+                    // 显示返回主页按钮
+                    document.getElementById('homeButton').style.display = 'inline-flex';
+                    
+                    // 更新文件信息
+                    document.getElementById('fileName').textContent = file.name;
+                    document.getElementById('fileSize').textContent = this.formatFileSize(file.size);
+                    
+                    // 渲染 Markdown
+                    const markdownContent = document.getElementById('markdownContent');
+                    
+                    // 多层降级渲染策略
+                    this.renderContent(markdownContent, content);
+                    
+                    // 滚动到顶部
+                    markdownContent.scrollTop = 0;
+                    
+                } catch (error) {
+                    console.error('显示内容失败:', error);
+                    this.showError('内容显示失败: ' + error.message);
+                    // 降级到纯文本显示
+                    const markdownContent = document.getElementById('markdownContent');
+                    if (markdownContent) {
+                        markdownContent.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word;">${this.escapeHtml(content)}</pre>`;
+                    }
+                }
+            }
+            
+            // 内容渲染方法（支持多层降级）
+            renderContent(container, content) {
+                try {
+                    // 第一层：尝试使用marked渲染
+                    if (typeof marked !== 'undefined' && marked.parse && this.librariesLoaded === true) {
+                        try {
+                            const html = marked.parse(content);
+                            container.innerHTML = html;
+                            
+                            // 尝试代码高亮
+                            this.highlightCode(container);
+                            console.log('使用marked渲染成功');
+                            return;
+                        } catch (markedError) {
+                            console.warn('marked渲染失败，尝试降级:', markedError);
+                        }
+                    }
+                    
+                    // 第二层：简单的Markdown解析
+                    try {
+                        const simpleHtml = this.simpleMarkdownParse(content);
+                        container.innerHTML = simpleHtml;
+                        console.log('使用简单Markdown解析成功');
+                        return;
+                    } catch (simpleError) {
+                        console.warn('简单Markdown解析失败:', simpleError);
+                    }
+                    
+                    // 第三层：纯文本显示
+                    container.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; font-family: inherit; margin: 0;">${this.escapeHtml(content)}</pre>`;
+                    console.log('使用纯文本显示');
+                    
+                } catch (error) {
+                    console.error('所有渲染方式都失败:', error);
+                    container.textContent = content;
+                }
+            }
+            
+            // 代码高亮（安全版本）
+            highlightCode(container) {
+                try {
+                    if (typeof hljs !== 'undefined' && hljs.highlightElement) {
+                        const codeBlocks = container.querySelectorAll('pre code');
+                        codeBlocks.forEach((block) => {
+                            try {
+                                hljs.highlightElement(block);
+                            } catch (err) {
+                                console.warn('单个代码块高亮失败:', err);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.warn('代码高亮失败:', error);
+                }
+            }
+            
+            // 简单的Markdown解析器（降级方案）
+            simpleMarkdownParse(content) {
+                let html = this.escapeHtml(content);
+                
+                // 标题
+                html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+                html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+                html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+                
+                // 粗体和斜体
+                html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                // 代码
+                html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+                
+                // 链接
+                html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+                
+                // 换行
+                html = html.replace(/\n/g, '<br>');
+                
+                return `<div style="line-height: 1.6;">${html}</div>`;
+            }
+
+            // 格式化文件大小
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // HTML 转义
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, (m) => map[m]);
+            }
+
+            // 显示错误信息
+            showError(message) {
+                // 创建错误提示
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-toast';
+                errorDiv.innerHTML = `
+                    <div class="error-content">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                        <span>${message}</span>
+                    </div>
+                `;
+                
+                // 添加错误提示样式
+                errorDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background-color: #ef4444;
+                    color: white;
+                    padding: 1rem 1.5rem;
+                    border-radius: 0.5rem;
+                    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                    z-index: 1000;
+                    animation: slideIn 0.3s ease-out;
+                `;
+                
+                const errorContent = errorDiv.querySelector('.error-content');
+                errorContent.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                `;
+                
+                const errorIcon = errorDiv.querySelector('svg');
+                errorIcon.style.cssText = `
+                    width: 20px;
+                    height: 20px;
+                    flex-shrink: 0;
+                `;
+                
+                // 添加动画样式
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes slideIn {
+                        from {
+                            transform: translateX(100%);
+                            opacity: 0;
+                        }
+                        to {
+                            transform: translateX(0);
+                            opacity: 1;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                document.body.appendChild(errorDiv);
+                
+                // 3秒后自动移除
+                setTimeout(() => {
+                    if (errorDiv.parentNode) {
+                        errorDiv.remove();
+                    }
+                    if (style.parentNode) {
+                        style.remove();
+                    }
+                }, 3000);
+            }
+
+            // 键盘快捷键处理
+            handleKeyboard(e) {
+                // Ctrl+O 打开文件
+                if (e.ctrlKey && e.key === 'o') {
+                    e.preventDefault();
+                    document.getElementById('fileInput').click();
+                }
+                
+                // Ctrl+T 切换主题
+                if (e.ctrlKey && e.key === 't') {
+                    e.preventDefault();
+                    this.toggleTheme();
+                }
+                
+                // Escape 返回欢迎界面
+                if (e.key === 'Escape') {
+                    this.showWelcomeScreen();
+                }
+            }
+
+            // 显示欢迎界面
+            showWelcomeScreen() {
+                document.getElementById('welcomeScreen').style.display = 'flex';
+                document.getElementById('contentViewer').style.display = 'none';
+                
+                // 隐藏返回主页按钮
+                document.getElementById('homeButton').style.display = 'none';
+                
+                // 重置文件输入
+                document.getElementById('fileInput').value = '';
+            }
+        }
+
+        // 初始化应用
+        let app;
+        
+        // 页面加载优化
+        function initializeApp() {
+            try {
+                app = new MDEasyApp();
+            } catch (error) {
+                console.error('应用初始化失败:', error);
+                // 隐藏加载指示器
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
+            }
+        }
+        
+        // 等待 DOM 加载完成
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            // DOM 已经加载完成
+            initializeApp();
+        }
+
+        // 全局错误处理
+        window.addEventListener('error', (e) => {
+            console.error('应用错误:', e.error);
+        });
+
+        // 处理未捕获的 Promise 错误
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('未处理的 Promise 错误:', e.reason);
+            e.preventDefault();
+        });
+        
+        // 页面可见性变化时的优化
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // 页面隐藏时可以暂停一些操作
+            } else {
+                // 页面重新可见时恢复操作
+            }
+        });
+    </script>
+</body>
+</html>
